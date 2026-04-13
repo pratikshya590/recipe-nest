@@ -1,29 +1,58 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/AuthContext";
 import { RecipeCard } from "../components/Shared";
-import { RECIPES, CATEGORIES } from "../services/mockData";
+import { getRecipes } from "../services/api";
+
+const CATEGORIES = ["All", "Desserts", "Italian", "Newari", "Drinks"];
+const IMAGE_BASE = "http://localhost:5000";
 
 export default function HomePage() {
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const { favourites, toggleFav } = useAuth();
   const navigate = useNavigate();
 
-  // TODO: GET /api/recipes?category=&search=
-  const filtered = RECIPES.filter((r) => {
-    const matchCat = category === "All" || r.category === category;
-    const q = search.toLowerCase();
-    return matchCat && (
-      r.title.toLowerCase().includes(q) ||
-      r.category.toLowerCase().includes(q) ||
-      r.chef.toLowerCase().includes(q)
-    );
+  useEffect(() => {
+    const delay = setTimeout(() => fetchRecipes(), 300);
+    return () => clearTimeout(delay);
+  }, [category, search]);
+
+  const fetchRecipes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getRecipes(category, search);
+      if (res.success) {
+        // Service returns { data: { recipes: [], pagination: {} } }
+        const list = res.data?.recipes ?? res.data;
+        setRecipes(Array.isArray(list) ? list : []);
+      } else {
+        setRecipes([]);
+        setError(res.message || "Failed to load recipes");
+      }
+    } catch (err) {
+      setRecipes([]);
+      setError("Could not connect to server");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const normalize = (r) => ({
+    ...r,
+    id: r._id,
+    chef: r.chef?.name || r.chef || "Unknown Chef",
+    image: r.image
+      ? r.image.startsWith("http") ? r.image : `${IMAGE_BASE}${r.image}`
+      : null,
   });
 
   return (
     <div className="page">
-      {/* Hero */}
       <div className="home-hero">
         <div className="home-hero-row">
           <div>
@@ -41,7 +70,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Category pills */}
       <div className="cat-bar">
         {CATEGORIES.map((c) => (
           <button key={c} className={`cat-pill ${category === c ? "on" : ""}`} onClick={() => setCategory(c)}>
@@ -50,25 +78,33 @@ export default function HomePage() {
         ))}
       </div>
 
-      {/* Recipe grid */}
       <div className="recipes-wrap">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="empty-state"><div className="ei">⏳</div><p>Loading recipes…</p></div>
+        ) : error ? (
           <div className="empty-state">
-            <div className="ei">🔍</div>
-            <h3>No recipes found</h3>
+            <div className="ei">⚠️</div><h3>{error}</h3>
+            <button className="btn btn-primary" onClick={fetchRecipes}>Try Again</button>
+          </div>
+        ) : recipes.length === 0 ? (
+          <div className="empty-state">
+            <div className="ei">🔍</div><h3>No recipes found</h3>
             <p>Try a different search or category.</p>
           </div>
         ) : (
           <div className="recipes-grid">
-            {filtered.map((r) => (
-              <RecipeCard
-                key={r.id}
-                recipe={r}
-                favourites={favourites}
-                toggleFav={toggleFav}
-                onClick={() => navigate(`/recipe/${r.id}`)}
-              />
-            ))}
+            {recipes.map((r) => {
+              const recipe = normalize(r);
+              return (
+                <RecipeCard
+                  key={recipe.id}
+                  recipe={recipe}
+                  favourites={favourites}
+                  toggleFav={toggleFav}
+                  onClick={() => navigate(`/recipe/${recipe.id}`)}
+                />
+              );
+            })}
           </div>
         )}
       </div>

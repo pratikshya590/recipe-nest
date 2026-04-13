@@ -57,6 +57,12 @@ const RecipeSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Draft/Publish system
+    status: {
+      type: String,
+      enum: ["draft", "published"],
+      default: "published",
+    },
   },
   {
     timestamps: true,

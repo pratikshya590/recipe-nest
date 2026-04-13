@@ -1,4 +1,5 @@
 const authService = require("../services/auth.service");
+const User = require("../models/user.model");
 const { NODE_ENV } = require("../../config/config");
 
 // Validation helpers
@@ -90,18 +91,16 @@ const register = async (req, res) => {
     }
 
     const { name, email, password, role } = req.body;
-
-    // Pass avatar file if uploaded
     const avatarFile = req.file ? req.file : null;
 
-    const result = await authService.registerUser({ 
-      name, email, password, role, avatarFile 
+    const result = await authService.registerUser({
+      name, email, password, role, avatarFile,
     });
-    
-    res.status(201).json({ 
-      success: true, 
-      message: result.message, 
-      data: result.data 
+
+    res.status(201).json({
+      success: true,
+      message: result.message,
+      data: result.data,
     });
   } catch (error) {
     handleError(res, error);
@@ -210,6 +209,19 @@ const updateAvatar = async (req, res) => {
   }
 };
 
+// Public — no auth required — returns all active chefs
+const getChefs = async (req, res) => {
+  try {
+    const chefs = await User.find({ role: "chef", isActive: true })
+      .select("name bio avatar createdAt")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, data: chefs });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -221,4 +233,5 @@ module.exports = {
   deactivateUser,
   logout,
   updateAvatar,
+  getChefs,
 };

@@ -1,34 +1,14 @@
 const recipeService = require("../services/recipe.service");
 const { NODE_ENV } = require("../../config/config");
 
-// Validation helpers
 const validateRecipe = (data) => {
   const errors = [];
-
-  if (!data.title || data.title.trim() === "") {
-    errors.push("Title is required");
-  }
-
-  if (!data.description || data.description.trim() === "") {
-    errors.push("Description is required");
-  }
-
-  if (!data.category || data.category.trim() === "") {
-    errors.push("Category is required");
-  }
-
-  if (!data.time || data.time.trim() === "") {
-    errors.push("Preparation time is required");
-  }
-
-  if (!data.ingredients || data.ingredients.length === 0) {
-    errors.push("At least one ingredient is required");
-  }
-
-  if (!data.instructions || data.instructions.length === 0) {
-    errors.push("At least one instruction is required");
-  }
-
+  if (!data.title || data.title.trim() === "") errors.push("Title is required");
+  if (!data.description || data.description.trim() === "") errors.push("Description is required");
+  if (!data.category || data.category.trim() === "") errors.push("Category is required");
+  if (!data.time || data.time.trim() === "") errors.push("Preparation time is required");
+  if (!data.ingredients || data.ingredients.length === 0) errors.push("At least one ingredient is required");
+  if (!data.instructions || data.instructions.length === 0) errors.push("At least one instruction is required");
   return errors;
 };
 
@@ -44,14 +24,9 @@ const handleError = (res, error) => {
 
 const createRecipe = async (req, res) => {
   try {
-    // Parse ingredients and instructions if they come as strings
     const body = { ...req.body };
-    if (typeof body.ingredients === "string") {
-      body.ingredients = body.ingredients.split("\n").filter(Boolean);
-    }
-    if (typeof body.instructions === "string") {
-      body.instructions = body.instructions.split("\n").filter(Boolean);
-    }
+    if (typeof body.ingredients === "string") body.ingredients = body.ingredients.split("\n").filter(Boolean);
+    if (typeof body.instructions === "string") body.instructions = body.instructions.split("\n").filter(Boolean);
 
     const errors = validateRecipe(body);
     if (errors.length > 0) {
@@ -101,14 +76,19 @@ const getChefRecipes = async (req, res) => {
 const updateRecipe = async (req, res) => {
   try {
     const body = { ...req.body };
-    if (typeof body.ingredients === "string") {
-      body.ingredients = body.ingredients.split("\n").filter(Boolean);
-    }
-    if (typeof body.instructions === "string") {
-      body.instructions = body.instructions.split("\n").filter(Boolean);
-    }
+    if (typeof body.ingredients === "string") body.ingredients = body.ingredients.split("\n").filter(Boolean);
+    if (typeof body.instructions === "string") body.instructions = body.instructions.split("\n").filter(Boolean);
 
     const result = await recipeService.updateRecipe(req.params.id, req.user.id, body);
+    res.status(200).json({ success: true, message: result.message, data: result.data });
+  } catch (error) {
+    handleError(res, error);
+  }
+};
+
+const toggleRecipeStatus = async (req, res) => {
+  try {
+    const result = await recipeService.toggleRecipeStatus(req.params.id, req.user.id);
     res.status(200).json({ success: true, message: result.message, data: result.data });
   } catch (error) {
     handleError(res, error);
@@ -130,7 +110,6 @@ const rateRecipe = async (req, res) => {
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ success: false, message: "Rating must be between 1 and 5" });
     }
-
     const result = await recipeService.rateRecipe(req.params.id, req.user.id, rating);
     res.status(200).json({ success: true, message: result.message, data: result.data });
   } catch (error) {
@@ -161,7 +140,6 @@ const updateRecipeImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "Please upload an image file" });
     }
-
     const result = await recipeService.updateRecipeImage(req.params.id, req.user.id, req.file);
     res.status(200).json({ success: true, message: result.message, data: result.data });
   } catch (error) {
@@ -175,6 +153,7 @@ module.exports = {
   getRecipeById,
   getChefRecipes,
   updateRecipe,
+  toggleRecipeStatus,
   deleteRecipe,
   rateRecipe,
   toggleFavourite,

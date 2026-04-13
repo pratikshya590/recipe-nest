@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-/* ── Toast notification ── */
+//Toast notification 
 export function Toast({ msg, type = "info", onClose }) {
   useEffect(() => {
     const t = setTimeout(onClose, 2600);
@@ -9,7 +9,7 @@ export function Toast({ msg, type = "info", onClose }) {
   return <div className={`toast toast-${type}`}>{msg}</div>;
 }
 
-/* ── Star Rating ── */
+//Star Rating 
 export function StarRating({ value = 0, onChange, readonly = false }) {
   const [hov, setHov] = useState(0);
   return (
@@ -27,7 +27,7 @@ export function StarRating({ value = 0, onChange, readonly = false }) {
   );
 }
 
-/* ── Recipe Card ── */
+//Recipe Card 
 export function RecipeCard({ recipe, favourites = [], toggleFav, onClick }) {
   const isFav = favourites.includes(recipe.id);
   return (

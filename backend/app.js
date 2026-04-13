@@ -7,6 +7,7 @@ const connectDB = require("./config/database");
 const authRoutes = require("./src/route/auth.routes");
 const recipeRoutes = require("./src/route/recipe.routes");
 
+
 const app = express();
 
 // CORS middleware - allows frontend to connect
@@ -19,7 +20,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Static file serving - for uploaded images
+// Static file serving for uploaded images
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 console.log("Uploads path:", path.join(__dirname, "uploads")); // debug
@@ -27,6 +28,9 @@ console.log("Uploads path:", path.join(__dirname, "uploads")); // debug
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     next();
   });
+
+app.use("/api/comments", require("./src/route/comment.routes"));
+app.use("/api/reports", require("./src/route/report.routes"));
 
 
 // Database connection

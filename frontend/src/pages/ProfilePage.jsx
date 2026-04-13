@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../components/AuthContext";
 import { Toast } from "../components/Shared";
-import { updateProfile, uploadAvatar } from "../services/api";
+import { updateProfile, uploadAvatar, changePassword } from "../services/api";
 
 const ROLE_LABEL = { foodlover: "Food Lover", chef: "Chef", admin: "Admin" };
 
@@ -13,8 +13,10 @@ export default function ProfilePage() {
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [passForm, setPassForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passLoading, setPassLoading] = useState(false);
 
-  // Handle avatar file selection — show preview
+  // Handle avatar file selection 
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -42,36 +44,59 @@ export default function ProfilePage() {
     }
   };
 
+  // Upload avatar
   const handleAvatarUpload = async () => {
-  if (!avatarFile) {
-    setToast({ msg: "Please select an image first", type: "error" }); return;
-  }
-  setUploadLoading(true);
-  try {
-    const formData = new FormData();
-    formData.append("avatar", avatarFile);
-    const result = await uploadAvatar(formData);
-    console.log("Upload result:", result); // debug
-    if (result.success) {
-      // Update user in localStorage with new avatar
-      const updatedUser = result.data.user;
-      login(updatedUser, localStorage.getItem("token"));
-      setAvatarPreview(null);
-      setAvatarFile(null);
-      setToast({ msg: "Profile photo updated! ✓", type: "success" });
-    } else {
-      setToast({ msg: result.message || "Upload failed", type: "error" });
+    if (!avatarFile) {
+      setToast({ msg: "Please select an image first", type: "error" }); return;
     }
-  } catch (error) {
-    console.error("Upload error:", error);
-    setToast({ msg: "Something went wrong!", type: "error" });
-  } finally {
-    setUploadLoading(false);
-  }
-};
+    setUploadLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", avatarFile);
+      const result = await uploadAvatar(formData);
+      if (result.success) {
+        const updatedUser = result.data.user;
+        login(updatedUser, localStorage.getItem("token"));
+        setAvatarPreview(null);
+        setAvatarFile(null);
+        setToast({ msg: "Profile photo updated! ✓", type: "success" });
+      } else {
+        setToast({ msg: result.message || "Upload failed", type: "error" });
+      }
+    } catch (error) {
+      setToast({ msg: "Something went wrong!", type: "error" });
+    } finally {
+      setUploadLoading(false);
+    }
+  };
 
-  const avatarSrc = avatarPreview || 
-  (user?.avatar ? `http://localhost:5000${user.avatar}` : null);
+  // Change password
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (passForm.newPassword !== passForm.confirmPassword) {
+      setToast({ msg: "New passwords do not match!", type: "error" }); return;
+    }
+    if (passForm.newPassword.length < 6) {
+      setToast({ msg: "Password must be at least 6 characters", type: "error" }); return;
+    }
+    setPassLoading(true);
+    try {
+      const result = await changePassword(passForm.currentPassword, passForm.newPassword);
+      if (result.success) {
+        setToast({ msg: "Password changed successfully! ✓", type: "success" });
+        setPassForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      } else {
+        setToast({ msg: result.message || "Failed to change password", type: "error" });
+      }
+    } catch (error) {
+      setToast({ msg: "Something went wrong!", type: "error" });
+    } finally {
+      setPassLoading(false);
+    }
+  };
+
+  const avatarSrc = avatarPreview ||
+    (user?.avatar ? `http://localhost:5000${user.avatar}` : null);
 
   return (
     <div className="page">
@@ -116,8 +141,8 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Profile Form */}
-        <div className="form-card">
+        {/* Edit Profile */}
+        <div className="form-card" style={{ marginBottom: "1rem" }}>
           <div className="form-card-title">Edit Profile</div>
           <form onSubmit={handleProfileUpdate}>
             <div className="form-grid">
@@ -150,12 +175,48 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
+            <button type="submit" className="btn btn-primary" disabled={loading}>
               {loading ? "Saving..." : "Save Changes"}
+            </button>
+          </form>
+        </div>
+
+        {/* Change Password */}
+        <div className="form-card" style={{ marginBottom: "1rem" }}>
+          <div className="form-card-title">Change Password</div>
+          <form onSubmit={handleChangePassword}>
+            <div className="form-group">
+              <label className="form-label">Current Password</label>
+              <input
+                className="form-input"
+                type="password"
+                placeholder="Enter current password"
+                value={passForm.currentPassword}
+                onChange={(e) => setPassForm({ ...passForm, currentPassword: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">New Password</label>
+              <input
+                className="form-input"
+                type="password"
+                placeholder="Enter new password"
+                value={passForm.newPassword}
+                onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Confirm New Password</label>
+              <input
+                className="form-input"
+                type="password"
+                placeholder="Confirm new password"
+                value={passForm.confirmPassword}
+                onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
+              />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={passLoading}>
+              {passLoading ? "Changing..." : "Change Password"}
             </button>
           </form>
         </div>

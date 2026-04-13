@@ -11,6 +11,8 @@ const createRecipe = async (recipeData, chefId) => {
       ingredients: recipeData.ingredients,
       instructions: recipeData.instructions,
       chef: chefId,
+      // Allow saving as draft
+      status: recipeData.status || "published",
     });
 
     await recipe.save();
@@ -18,7 +20,7 @@ const createRecipe = async (recipeData, chefId) => {
 
     return {
       success: true,
-      message: "Recipe created successfully",
+      message: recipe.status === "draft" ? "Recipe saved as draft" : "Recipe created successfully",
       data: { recipe },
     };
   } catch (error) {
@@ -33,8 +35,8 @@ const getAllRecipes = async (options = {}) => {
     const limit = parseInt(options.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const query = { isActive: true };
-    if (options.category && options.category !== "All") {
+    // Only show published recipes to public
+const query = { isActive: true, $or: [{ status: "published" }, { status: { $exists: false } }] };    if (options.category && options.category !== "All") {
       query.category = options.category;
     }
     if (options.search) {
@@ -80,6 +82,7 @@ const getRecipeById = async (recipeId) => {
   }
 };
 
+// Chef gets ALL their recipes including drafts
 const getChefRecipes = async (chefId) => {
   try {
     const recipes = await Recipe.find({ chef: chefId, isActive: true })
@@ -102,7 +105,7 @@ const updateRecipe = async (recipeId, chefId, updateData) => {
       throw error;
     }
 
-    const allowedUpdates = ["title", "description", "category", "time", "ingredients", "instructions"];
+    const allowedUpdates = ["title", "description", "category", "time", "ingredients", "instructions", "status"];
     const filteredData = {};
     for (const key of allowedUpdates) {
       if (updateData[key] !== undefined) {
@@ -122,6 +125,31 @@ const updateRecipe = async (recipeId, chefId, updateData) => {
     };
   } catch (error) {
     console.error("Error in updateRecipe:", error.message);
+    throw error;
+  }
+};
+
+// Toggle publish/draft status
+const toggleRecipeStatus = async (recipeId, chefId) => {
+  try {
+    const recipe = await Recipe.findOne({ _id: recipeId, chef: chefId });
+    if (!recipe) {
+      const error = new Error("Recipe not found or not authorized");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const newStatus = recipe.status === "published" ? "draft" : "published";
+    recipe.status = newStatus;
+    await recipe.save();
+
+    return {
+      success: true,
+      message: newStatus === "published" ? "Recipe published!" : "Recipe moved to drafts",
+      data: { status: newStatus },
+    };
+  } catch (error) {
+    console.error("Error in toggleRecipeStatus:", error.message);
     throw error;
   }
 };
@@ -157,7 +185,6 @@ const rateRecipe = async (recipeId, userId, rating) => {
       throw error;
     }
 
-    // Calculate new average rating
     const newRatingCount = recipe.ratingCount + 1;
     const newRating = ((recipe.rating * recipe.ratingCount) + rating) / newRatingCount;
 
@@ -186,13 +213,11 @@ const toggleFavourite = async (recipeId, userId) => {
     }
 
     const isFavourited = recipe.favouritedBy.includes(userId);
-
     if (isFavourited) {
       recipe.favouritedBy.pull(userId);
     } else {
       recipe.favouritedBy.push(userId);
     }
-
     await recipe.save();
 
     return {
@@ -211,6 +236,7 @@ const getUserFavourites = async (userId) => {
     const recipes = await Recipe.find({
       favouritedBy: userId,
       isActive: true,
+      status: "published",
     }).populate("chef", "name avatar");
 
     return { success: true, data: { recipes } };
@@ -229,12 +255,10 @@ const updateRecipeImage = async (recipeId, chefId, file) => {
       throw error;
     }
 
-    // Delete old image if exists
     if (recipe.image) {
       deleteOldFile(recipe.image, "recipe");
     }
 
-    // Save new image
     const imageUrl = getFileUrl(file.filename, "recipe");
     recipe.image = imageUrl;
     await recipe.save();
@@ -256,6 +280,7 @@ module.exports = {
   getRecipeById,
   getChefRecipes,
   updateRecipe,
+  toggleRecipeStatus,
   deleteRecipe,
   rateRecipe,
   toggleFavourite,
