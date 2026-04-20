@@ -2,13 +2,20 @@ const authService = require("../services/auth.service");
 const User = require("../models/user.model");
 const { NODE_ENV } = require("../../config/config");
 
-// Validation helpers
+// ── Password strength validator ───────────────────────────────────────────────
+const validatePasswordStrength = (password) => {
+  const errors = [];
+  if (password.length < 8) errors.push("Password must be at least 8 characters");
+  if (!/[A-Z]/.test(password)) errors.push("Password must contain at least one uppercase letter");
+  if (!/[0-9]/.test(password)) errors.push("Password must contain at least one number");
+  if (!/[!@#$%^&*]/.test(password)) errors.push("Password must contain at least one special character (!@#$%^&*)");
+  return errors;
+};
+
 const validateRegister = (data) => {
   const errors = [];
 
-  if (!data.name || data.name.trim() === "") {
-    errors.push("Name is required");
-  }
+  if (!data.name || data.name.trim() === "") errors.push("Name is required");
 
   if (!data.email || data.email.trim() === "") {
     errors.push("Email is required");
@@ -18,8 +25,8 @@ const validateRegister = (data) => {
 
   if (!data.password || data.password === "") {
     errors.push("Password is required");
-  } else if (data.password.length < 6) {
-    errors.push("Password must be at least 6 characters");
+  } else {
+    errors.push(...validatePasswordStrength(data.password));
   }
 
   if (data.role && !["foodlover", "chef"].includes(data.role)) {
@@ -31,45 +38,27 @@ const validateRegister = (data) => {
 
 const validateLogin = (data) => {
   const errors = [];
-
-  if (!data.email || data.email.trim() === "") {
-    errors.push("Email is required");
-  }
-
-  if (!data.password || data.password === "") {
-    errors.push("Password is required");
-  }
-
+  if (!data.email || data.email.trim() === "") errors.push("Email is required");
+  if (!data.password || data.password === "") errors.push("Password is required");
   return errors;
 };
 
 const validateUpdateProfile = (data) => {
   const errors = [];
   const allowedFields = ["name", "bio", "avatar"];
-
-  const updateKeys = Object.keys(data);
-  const invalidFields = updateKeys.filter((key) => !allowedFields.includes(key));
-
-  if (invalidFields.length > 0) {
-    errors.push(`Cannot update these fields: ${invalidFields.join(", ")}`);
-  }
-
+  const invalidFields = Object.keys(data).filter((key) => !allowedFields.includes(key));
+  if (invalidFields.length > 0) errors.push(`Cannot update these fields: ${invalidFields.join(", ")}`);
   return errors;
 };
 
 const validateChangePassword = (data) => {
   const errors = [];
-
-  if (!data.currentPassword || data.currentPassword === "") {
-    errors.push("Current password is required");
-  }
-
+  if (!data.currentPassword || data.currentPassword === "") errors.push("Current password is required");
   if (!data.newPassword || data.newPassword === "") {
     errors.push("New password is required");
-  } else if (data.newPassword.length < 6) {
-    errors.push("New password must be at least 6 characters");
+  } else {
+    errors.push(...validatePasswordStrength(data.newPassword));
   }
-
   return errors;
 };
 
@@ -89,22 +78,11 @@ const register = async (req, res) => {
     if (errors.length > 0) {
       return res.status(400).json({ success: false, message: "Validation failed", errors });
     }
-
     const { name, email, password, role } = req.body;
     const avatarFile = req.file ? req.file : null;
-
-    const result = await authService.registerUser({
-      name, email, password, role, avatarFile,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: result.data,
-    });
-  } catch (error) {
-    handleError(res, error);
-  }
+    const result = await authService.registerUser({ name, email, password, role, avatarFile });
+    res.status(201).json({ success: true, message: result.message, data: result.data });
+  } catch (error) { handleError(res, error); }
 };
 
 const login = async (req, res) => {
@@ -113,22 +91,17 @@ const login = async (req, res) => {
     if (errors.length > 0) {
       return res.status(400).json({ success: false, message: "Validation failed", errors });
     }
-
     const { email, password } = req.body;
     const result = await authService.loginUser(email, password);
     res.status(200).json({ success: true, message: result.message, data: result.data });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 const getProfile = async (req, res) => {
   try {
     const result = await authService.getUserProfile(req.user.id);
     res.status(200).json({ success: true, data: result.data });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 const updateProfile = async (req, res) => {
@@ -137,12 +110,9 @@ const updateProfile = async (req, res) => {
     if (errors.length > 0) {
       return res.status(400).json({ success: false, message: "Validation failed", errors });
     }
-
     const result = await authService.updateUserProfile(req.user.id, req.body);
     res.status(200).json({ success: true, message: result.message, data: result.data });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 const getAllUsers = async (req, res) => {
@@ -154,18 +124,14 @@ const getAllUsers = async (req, res) => {
     };
     const result = await authService.getAllUsers(options);
     res.status(200).json({ success: true, data: result.data });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 const getUserById = async (req, res) => {
   try {
     const result = await authService.getUserProfile(req.params.id);
     res.status(200).json({ success: true, data: result.data });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 const changePassword = async (req, res) => {
@@ -174,22 +140,17 @@ const changePassword = async (req, res) => {
     if (errors.length > 0) {
       return res.status(400).json({ success: false, message: "Validation failed", errors });
     }
-
     const { currentPassword, newPassword } = req.body;
     const result = await authService.changePassword(req.user.id, currentPassword, newPassword);
     res.status(200).json({ success: true, message: result.message });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 const deactivateUser = async (req, res) => {
   try {
     const result = await authService.deactivateUser(req.params.id);
     res.status(200).json({ success: true, message: result.message });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 const logout = async (req, res) => {
@@ -201,37 +162,22 @@ const updateAvatar = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "Please upload an image file" });
     }
-
     const result = await authService.updateAvatar(req.user.id, req.file);
     res.status(200).json({ success: true, message: result.message, data: result.data });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
-// Public — no auth required — returns all active chefs
 const getChefs = async (req, res) => {
   try {
     const chefs = await User.find({ role: "chef", isActive: true })
       .select("name bio avatar createdAt")
       .sort({ createdAt: -1 });
-
     res.status(200).json({ success: true, data: chefs });
-  } catch (error) {
-    handleError(res, error);
-  }
+  } catch (error) { handleError(res, error); }
 };
 
 module.exports = {
-  register,
-  login,
-  getProfile,
-  updateProfile,
-  getAllUsers,
-  getUserById,
-  changePassword,
-  deactivateUser,
-  logout,
-  updateAvatar,
-  getChefs,
+  register, login, getProfile, updateProfile,
+  getAllUsers, getUserById, changePassword,
+  deactivateUser, logout, updateAvatar, getChefs,
 };
